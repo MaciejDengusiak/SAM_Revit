@@ -5,6 +5,7 @@ using SAM.Core.Grasshopper.Revit;
 using SAM.Core.Revit;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 
 namespace SAM.Analytical.Grasshopper.Revit
@@ -51,37 +52,44 @@ namespace SAM.Analytical.Grasshopper.Revit
         {
             base.OnStarted(document);
 
-            // Disable all previous walls joins
-            //IEnumerable<Wall> walls = Params.TrackedElements<Wall>("Wall", document);
-            //var pinnedWalls = walls.Where(x => x.Pinned).
-            //                  Select
-            //                  (
-            //                    wall =>
-            //                    (
-            //                      wall,
-            //                      (wall.Location as LocationCurve).get_JoinType(0),
-            //                      (wall.Location as LocationCurve).get_JoinType(1)
-            //                    )
-            //                  );
+            //Disable all previous walls joins
+            IEnumerable<HostObject> hostObjects = RhinoInside.Revit.GH.ElementTracking.TrackingParamElementExtensions.TrackedElements<HostObject>(Params, "HostObject", document);
+            if(hostObjects == null || hostObjects.Count() == 0)
+            {
+                return;
+            }
 
-            //foreach (var (wall, joinType0, joinType1) in pinnedWalls)
-            //{
-            //    var location = wall.Location as LocationCurve;
+            IEnumerable<Wall> walls = hostObjects.ToList().FindAll(x => x is Wall).ConvertAll(x => (Wall)x);
 
-            //    if (WallUtils.IsWallJoinAllowedAtEnd(wall, 0))
-            //    {
-            //        WallUtils.DisallowWallJoinAtEnd(wall, 0);
-            //        WallUtils.AllowWallJoinAtEnd(wall, 0);
-            //        location.set_JoinType(0, joinType0);
-            //    }
+            var pinnedWalls = walls.Where(x => x.Pinned).
+                              Select
+                              (
+                                wall =>
+                                (
+                                  wall,
+                                  (wall.Location as LocationCurve).get_JoinType(0),
+                                  (wall.Location as LocationCurve).get_JoinType(1)
+                                )
+                              );
 
-            //    if (WallUtils.IsWallJoinAllowedAtEnd(wall, 1))
-            //    {
-            //        WallUtils.DisallowWallJoinAtEnd(wall, 1);
-            //        WallUtils.AllowWallJoinAtEnd(wall, 1);
-            //        location.set_JoinType(1, joinType1);
-            //    }
-            //}
+            foreach (var (wall, joinType0, joinType1) in pinnedWalls)
+            {
+                var location = wall.Location as LocationCurve;
+
+                if (WallUtils.IsWallJoinAllowedAtEnd(wall, 0))
+                {
+                    WallUtils.DisallowWallJoinAtEnd(wall, 0);
+                    WallUtils.AllowWallJoinAtEnd(wall, 0);
+                    location.set_JoinType(0, joinType0);
+                }
+
+                if (WallUtils.IsWallJoinAllowedAtEnd(wall, 1))
+                {
+                    WallUtils.DisallowWallJoinAtEnd(wall, 1);
+                    WallUtils.AllowWallJoinAtEnd(wall, 1);
+                    location.set_JoinType(1, joinType1);
+                }
+            }
         }
 
         public override void OnPrepare(IReadOnlyCollection<Document> documents)
@@ -109,7 +117,7 @@ namespace SAM.Analytical.Grasshopper.Revit
             base.OnDone(status);
         }
 
-        private void ReconstructSAMAnalyticalPanelRevit(Document document, ref HostObject hostObject, Panel panel, ConvertSettings convertSettings = null, bool _run = false)
+        private void ReconstructSAMAnalyticalPanelRevit(Document document, ref HostObject hostObject, Panel panel, [DefaultValue(null)] ConvertSettings convertSettings, [DefaultValue(false)] bool _run)
         {
             run = _run;
 
